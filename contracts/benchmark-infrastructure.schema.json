@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Diegoecab/kvs-benchmark-infra/contracts/benchmark-infrastructure.schema.json",
+  "title": "KVS benchmark infrastructure outputs",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "targets"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "runId": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "targets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "aws": { "$ref": "#/$defs/awsTarget" },
+        "adb": { "$ref": "#/$defs/ociTarget" },
+        "ndcs": { "$ref": "#/$defs/ociTarget" }
+      }
+    }
+  },
+  "$defs": {
+    "baseTarget": {
+      "type": "object",
+      "required": ["region", "runnerId", "resource", "evidenceBucket"],
+      "properties": {
+        "region": { "type": "string" },
+        "runnerId": { "type": "string" },
+        "resource": { "type": "string" },
+        "evidenceBucket": { "type": "string" }
+      }
+    },
+    "awsTarget": {
+      "allOf": [
+        { "$ref": "#/$defs/baseTarget" },
+        { "properties": { "region": { "const": "us-east-1" }, "runnerId": { "pattern": "^i-[a-f0-9]+$" } } }
+      ]
+    },
+    "ociTarget": {
+      "allOf": [
+        { "$ref": "#/$defs/baseTarget" },
+        {
+          "required": ["runnerCompartmentId", "compartmentId"],
+          "properties": {
+            "region": { "const": "us-ashburn-1" },
+            "runnerId": { "pattern": "^ocid1\\.instance\\." },
+            "runnerCompartmentId": { "pattern": "^ocid1\\.(compartment|tenancy)\\." },
+            "compartmentId": { "pattern": "^ocid1\\.compartment\\." }
+          }
+        }
+      ]
+    }
+  }
+}
