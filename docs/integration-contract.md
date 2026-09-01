@@ -14,7 +14,7 @@ The control dashboard invokes this repository through a typed adapter. Free-form
 
 ## Required invariants
 
-- AWS region is `us-east-1`; OCI region is `us-ashburn-1`.
+- AWS DynamoDB is in `us-east-1`; the OCI deployment region is an explicit immutable input and currently supports `us-ashburn-1` and `us-dallas-1`.
 - Resources are single-region and tagged with `kvs-benchmark-run-id`.
 - Runner control is AWS SSM or OCI Compute Run Command.
 - Evidence uses S3 or OCI Object Storage.

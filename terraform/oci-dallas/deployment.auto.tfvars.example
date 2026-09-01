@@ -1,0 +1,8 @@
+# Copy this file to deployment.auto.tfvars. Never commit the populated copy.
+oci_profile         = "LATINOAMERICA_APIKEY"
+region              = "us-dallas-1"
+run_id              = "20260901-dallas-1000"
+tenancy_ocid         = "<tenancy-ocid>"
+compartment_ocid     = "<compartment-ocid>"
+availability_domain = "IAfA:US-DALLAS-1-AD-1"
+image_ocid           = "<oracle-linux-9-image-ocid>"

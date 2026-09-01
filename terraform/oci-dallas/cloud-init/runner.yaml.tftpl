@@ -1,0 +1,36 @@
+#cloud-config
+package_update: true
+packages:
+  - chrony
+  - jq
+  - podman
+  - tar
+  - gzip
+
+write_files:
+  - path: /etc/sudoers.d/101-oracle-cloud-agent-kvs-benchmark
+    owner: root:root
+    permissions: "0440"
+    content: |
+      ocarun ALL=(root) NOPASSWD: /usr/bin/podman *, /usr/bin/mkdir *, /usr/bin/chmod *, /usr/bin/chronyc *, /usr/bin/jq *
+  - path: /etc/kvs-benchmark-runner-release
+    owner: root:root
+    permissions: "0444"
+    content: |
+      schemaVersion=1
+      runnerType=oci-kvs-benchmark
+      runId=${run_id}
+      target=${target}
+      image=${runner_image}
+
+runcmd:
+  - [systemctl, enable, --now, chronyd]
+  - [systemctl, enable, --now, oracle-cloud-agent]
+  - [install, -d, -o, root, -g, root, -m, "0755", /opt/kvs-dashboard]
+  - [install, -d, -o, root, -g, ocarun, -m, "0750", /opt/meli-kvs-benchmark]
+  - [install, -d, -o, root, -g, ocarun, -m, "0750", /opt/meli-kvs-benchmark/${run_id}]
+  - [visudo, -cf, /etc/sudoers.d/101-oracle-cloud-agent-kvs-benchmark]
+  - [podman, pull, "${runner_image}"]
+  - [bash, -lc, "sudo -u ocarun sudo -n /usr/bin/podman image exists '${runner_image}'"]
+  - [bash, -lc, "chronyc tracking >/dev/null"]
+  - [touch, /var/lib/cloud/instance/kvs-benchmark-ready]

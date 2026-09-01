@@ -11,7 +11,7 @@ The repository contains an executable OCI replacement-runner stack and the versi
 Planned provider stacks:
 
 - AWS `us-east-1`: private runner controlled by Systems Manager, DynamoDB table, private S3 evidence bucket, and least-privilege IAM.
-- OCI `us-ashburn-1`: private runners controlled by Compute Run Command, ADB DynamoDB API and/or OCI NoSQL destinations, private Object Storage evidence buckets, dynamic groups, and least-privilege policies.
+- OCI `us-ashburn-1` or `us-dallas-1`: private runners controlled by Compute Run Command, ADB DynamoDB API and/or OCI NoSQL destinations, private Object Storage evidence buckets, dynamic groups, and least-privilege policies.
 
 No SSH, SCP, inbound public access, cross-region resources, or benchmark execution belongs here.
 

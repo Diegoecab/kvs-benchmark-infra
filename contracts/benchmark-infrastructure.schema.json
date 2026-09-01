@@ -41,7 +41,7 @@
         {
           "required": ["runnerCompartmentId", "compartmentId"],
           "properties": {
-            "region": { "const": "us-ashburn-1" },
+            "region": { "enum": ["us-ashburn-1", "us-dallas-1"] },
             "runnerId": { "pattern": "^ocid1\\.instance\\." },
             "runnerCompartmentId": { "pattern": "^ocid1\\.(compartment|tenancy)\\." },
             "compartmentId": { "pattern": "^ocid1\\.compartment\\." }

@@ -6,4 +6,6 @@ The OCI transitional stack in [`oci/`](oci/) creates only replacement-runner res
 
 The checked-in OCI runner cloud-init baseline is available at [`cloud-init/oci-runner.yaml`](cloud-init/oci-runner.yaml) and is used for the transitional runner replacement. It installs Podman, jq, chrony, and archive tools; enables the Oracle Cloud Agent and clock service; grants `ocarun` passwordless access only to commands invoked by the harness; preloads the immutable image by digest; validates image access as `ocarun`; and writes `/var/lib/cloud/instance/kvs-benchmark-ready` only after every gate passes.
 
+The isolated [`oci-dallas/`](oci-dallas/) root module is the 1,000 RU/WU Dallas deployment. It has a separate state boundary and creates its own VCN, private runners, evidence bucket, and OCI NoSQL table. It does not store an Autonomous Database ADMIN password or DynamoDB API keys in Terraform state.
+
 Before changing the runner image, update both the image reference and release marker in the cloud-init file, validate the image on `linux/amd64`, and run the benchmark repository acceptance suite.
