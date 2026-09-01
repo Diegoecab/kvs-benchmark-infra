@@ -1,0 +1,25 @@
+#cloud-config
+package_update: true
+packages:
+  - chrony
+  - jq
+  - podman
+  - tar
+  - gzip
+
+write_files:
+  - path: /etc/sudoers.d/101-oracle-cloud-agent-kvs-benchmark
+    owner: root:root
+    permissions: "0440"
+    content: |
+      ocarun ALL=(root) NOPASSWD: /usr/bin/podman *, /usr/bin/mkdir *, /usr/bin/chmod *, /usr/bin/chronyc *, /usr/bin/jq *
+
+runcmd:
+  - [systemctl, enable, --now, chronyd]
+  - [systemctl, enable, --now, oracle-cloud-agent]
+  - [install, -d, -o, root, -g, root, -m, "0755", /opt/kvs-dashboard]
+  - [visudo, -cf, /etc/sudoers.d/101-oracle-cloud-agent-kvs-benchmark]
+  - [podman, pull, "ghcr.io/diegoecab/kvs-benchmark-runner@sha256:55ce8eeccce8e8e698ec7b672e491d0e99c28813a2d8ad93ef44ae85330131e0"]
+  - [bash, -lc, "printf '%s\n' 'schemaVersion=1' 'runnerType=oci-kvs-benchmark' 'imageDigest=sha256:55ce8eeccce8e8e698ec7b672e491d0e99c28813a2d8ad93ef44ae85330131e0' > /etc/kvs-benchmark-runner-release"]
+  - [bash, -lc, "sudo -u ocarun sudo -n /usr/bin/podman image exists 'ghcr.io/diegoecab/kvs-benchmark-runner@sha256:55ce8eeccce8e8e698ec7b672e491d0e99c28813a2d8ad93ef44ae85330131e0'"]
+  - [touch, /var/lib/cloud/instance/kvs-benchmark-ready]

@@ -6,7 +6,7 @@ This repository owns cloud resources only. It does not implement workloads, calc
 
 ## Current milestone
 
-The repository contract and Terraform layout are initialized. Deployment is intentionally disabled while the benchmark dashboard is validated against existing infrastructure.
+The repository contains an executable OCI replacement-runner stack and the versioned dashboard contract. The AWS stack remains planned; existing AWS infrastructure is still discovered read-only by the benchmark dashboard.
 
 Planned provider stacks:
 
@@ -14,6 +14,8 @@ Planned provider stacks:
 - OCI `us-ashburn-1`: private runners controlled by Compute Run Command, ADB DynamoDB API and/or OCI NoSQL destinations, private Object Storage evidence buckets, dynamic groups, and least-privilege policies.
 
 No SSH, SCP, inbound public access, cross-region resources, or benchmark execution belongs here.
+
+The first controlled OCI deployment is recorded in [`docs/deployments/20260901-runner-replacement.md`](docs/deployments/20260901-runner-replacement.md). Its databases, tables, buckets, VCN, and previous runners are deliberately outside Terraform state.
 
 ## Safety model
 

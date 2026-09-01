@@ -2,7 +2,6 @@
 *.tfstate
 *.tfstate.*
 *.tfplan
-.terraform.lock.hcl
 override.tf
 override.tf.json
 *_override.tf
@@ -11,3 +10,4 @@ override.tf.json
 !*.auto.tfvars.example
 .DS_Store
 Thumbs.db
+terraform/oci/outputs.json

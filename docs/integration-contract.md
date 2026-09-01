@@ -19,8 +19,23 @@ The control dashboard invokes this repository through a typed adapter. Free-form
 - Runner control is AWS SSM or OCI Compute Run Command.
 - Evidence uses S3 or OCI Object Storage.
 - Runners do not require public IPs, SSH, SCP, or local private keys.
+- OCI runners use a private subnet with no ingress rules and outbound HTTPS through a NAT Gateway; an Internet Gateway plus public VNIC is not an equivalent baseline.
 - Database resources are isolated and provisioned; product autoscaling settings are explicit outputs.
 - `destroy` targets only resources recorded in the dedicated Terraform state.
+
+## OCI runner readiness
+
+An OCI runner returned by the infrastructure project is not ready until all of the following are true:
+
+- the instance lifecycle state is `RUNNING`;
+- the `Compute Instance Run Command` plugin is `RUNNING`;
+- `/var/lib/cloud/instance/kvs-benchmark-ready` exists;
+- `ocarun` can run `sudo -n /usr/bin/podman image exists <IMAGE_DIGEST>`;
+- `chronyc tracking` succeeds;
+- the instance principal can access its selected database table and evidence bucket;
+- a two-second single-target cloud smoke completes and its evidence package passes accounting.
+
+The local dashboard remains the control plane. SSH, SCP, a public IP, and a private key are not part of the normal execution contract.
 
 ## Output handoff
 
