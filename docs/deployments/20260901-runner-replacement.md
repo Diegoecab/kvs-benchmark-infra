@@ -2,7 +2,7 @@
 
 ## Scope
 
-- Tenancy profile: `PITWALL_API`
+- Tenancy profile: environment-specific OCI CLI profile (not stored in this reusable deployment record)
 - Region: `us-ashburn-1`
 - Availability domain: `US-ASHBURN-AD-1`
 - Parent boundary: existing exclusive `meli-kvs-bm-20260826-02` compartment
