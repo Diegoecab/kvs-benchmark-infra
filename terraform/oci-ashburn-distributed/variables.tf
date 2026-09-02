@@ -80,7 +80,7 @@ variable "bootstrap_internet_access_enabled" {
 variable "runner_image" {
   description = "Immutable OCI benchmark container image reference, pinned by SHA-256 digest."
   type        = string
-  default     = "ghcr.io/diegoecab/kvs-benchmark-runner@sha256:6eb0c3d31123dfec7b49cd6c319d0ebc781efe4b397b2a38997be6249577188b"
+  default     = "ghcr.io/diegoecab/kvs-benchmark-runner@sha256:7bf7c3d1d3d5ae1b650ca38f8434ec545572bec6a7c07bdd3829b0f29bb392c9"
 
   validation {
     condition     = can(regex("@sha256:[0-9a-f]{64}$", var.runner_image))
