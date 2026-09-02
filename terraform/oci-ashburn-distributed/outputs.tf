@@ -46,6 +46,8 @@ output "infrastructure_contract" {
     runId              = var.run_id
     loadGeneratorCount = 3
     runnerImage        = var.runner_image
+    machineImageId     = var.instance_image_ocid
+    bootstrapMode      = var.runner_bootstrap_mode
     targets = {
       adb = {
         provider           = "oci"
@@ -145,11 +147,13 @@ output "deployment" {
   description = "Control-plane handoff containing resource and per-source runner identities, without credentials."
   sensitive   = true
   value = {
-    schema_version = 1
-    run_id         = var.run_id
-    region         = var.region
-    compartment_id = var.compartment_ocid
-    runner_image   = var.runner_image
+    schema_version   = 1
+    run_id           = var.run_id
+    region           = var.region
+    compartment_id   = var.compartment_ocid
+    runner_image     = var.runner_image
+    machine_image_id = var.instance_image_ocid
+    bootstrap_mode   = var.runner_bootstrap_mode
     targets = {
       adb = {
         resource_id = oci_database_autonomous_database.benchmark.id

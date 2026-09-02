@@ -63,13 +63,35 @@ variable "run_id" {
 }
 
 variable "ubuntu_ami_id" {
-  description = "Optional pinned Ubuntu 24.04 amd64 AMI. When null, the newest Canonical Ubuntu 24.04 gp3 image is selected."
+  description = "Deprecated compatibility input for a pinned Ubuntu 24.04 AMI. Prefer runner_ami_id."
   type        = string
   default     = null
 
   validation {
     condition     = var.ubuntu_ami_id == null || can(regex("^ami-[a-f0-9]+$", var.ubuntu_ami_id))
     error_message = "ubuntu_ami_id must be null or a valid AMI ID."
+  }
+}
+
+variable "runner_ami_id" {
+  description = "Pinned promoted benchmark-runner AMI. Null falls back to ubuntu_ami_id or the newest Canonical Ubuntu image in install mode."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.runner_ami_id == null || can(regex("^ami-[a-f0-9]+$", var.runner_ami_id))
+    error_message = "runner_ami_id must be null or a valid AMI ID."
+  }
+}
+
+variable "runner_bootstrap_mode" {
+  description = "install performs the one-time package/image bootstrap; prebaked requires a promoted AMI whose embedded manifest matches runner_image."
+  type        = string
+  default     = "install"
+
+  validation {
+    condition     = contains(["install", "prebaked"], var.runner_bootstrap_mode)
+    error_message = "runner_bootstrap_mode must be install or prebaked."
   }
 }
 

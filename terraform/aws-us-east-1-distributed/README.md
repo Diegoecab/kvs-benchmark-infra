@@ -6,11 +6,11 @@ This isolated Terraform root module creates one AWS DynamoDB target and three in
 
 - One provisioned DynamoDB table with canonical string partition/sort keys (`pk`, `sk`) and fixed 500 RCU / 500 WCU.
 - One private, public-access-blocked, AES-256 encrypted, versioned S3 evidence bucket.
-- Exactly three Ubuntu `t3.micro` runners (2 vCPU, 1 GiB each), each with its own Elastic IP, unlimited CPU credits, and one-minute EC2 monitoring.
+- Exactly three `t3.micro` runners (2 vCPU, 1 GiB each), each with its own Elastic IP, unlimited CPU credits, and one-minute EC2 monitoring.
 - One no-ingress security group. Egress is limited to HTTPS, VPC DNS, and Amazon Time Sync NTP.
 - One EC2 role and instance profile: the standard SSM managed-instance policy plus table-scoped `DescribeTable`/`GetItem`/`PutItem` and write-only access below the bucket's `results/` evidence prefix.
 
-Cloud-init installs Podman, AWS CLI, chrony, and the SSM agent, requires working clock synchronization, pulls the immutable runner image by digest, and writes the readiness marker only after every gate succeeds.
+A promoted AMI already contains Podman, AWS CLI, chrony, the SSM agent, and the immutable runner image by digest. In `prebaked` mode cloud-init only validates that manifest, starts services, checks clock synchronization, and writes the readiness marker. Package installation and registry downloads are reserved for image construction or recovery.
 
 The configured workload rate remains the aggregate offered load for each target. The dashboard uses `loadGeneratorCount = 3` and deterministically shards that target load across the three source VMs; it does not multiply the requested offered rate by three.
 

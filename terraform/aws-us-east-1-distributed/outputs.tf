@@ -48,6 +48,8 @@ output "infrastructure_contract" {
     runId              = var.run_id
     loadGeneratorCount = local.runner_count
     runnerImage        = var.runner_image
+    machineImageId     = local.runner_ami
+    bootstrapMode      = var.runner_bootstrap_mode
     targets = {
       aws = {
         provider         = "aws"
@@ -69,6 +71,8 @@ output "deployment" {
     runId            = var.run_id
     region           = var.region
     availabilityZone = var.availability_zone
+    machineImageId   = local.runner_ami
+    bootstrapMode    = var.runner_bootstrap_mode
     resources = {
       vpcId              = var.vpc_id
       subnetId           = var.subnet_id

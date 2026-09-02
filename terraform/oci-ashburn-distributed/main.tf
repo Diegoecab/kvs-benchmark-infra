@@ -38,6 +38,13 @@ check "six_distinct_private_ips" {
   }
 }
 
+check "prebaked_image_never_uses_nat" {
+  assert {
+    condition     = var.runner_bootstrap_mode != "prebaked" || !var.bootstrap_internet_access_enabled
+    error_message = "prebaked mode must start with bootstrap_internet_access_enabled=false."
+  }
+}
+
 data "oci_objectstorage_namespace" "current" {
   compartment_id = var.tenancy_ocid
 }
@@ -245,10 +252,11 @@ resource "oci_core_instance" "runner" {
 
   metadata = {
     user_data = base64encode(templatefile("${path.module}/cloud-init/runner.yaml.tftpl", {
-      runner_image = var.runner_image
-      target       = each.value.target
-      source       = each.value.source
-      run_id       = var.run_id
+      bootstrap_mode = var.runner_bootstrap_mode
+      runner_image   = var.runner_image
+      target         = each.value.target
+      source         = each.value.source
+      run_id         = var.run_id
     }))
   }
 }

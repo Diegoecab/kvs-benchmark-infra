@@ -1,0 +1,10 @@
+oci_config_file    = "<absolute-path-to-oci-config>"
+oci_profile        = "<oci-profile>"
+region             = "us-ashburn-1"
+availability_domain = "<availability-domain>"
+compartment_ocid   = "<image-compartment-ocid>"
+subnet_ocid        = "<image-builder-subnet-ocid>"
+base_image_ocid    = "<pinned-oracle-linux-image-ocid>"
+runner_image       = "ghcr.io/example/kvs-benchmark-runner@sha256:<64-hex-digest>"
+use_private_ip     = true
+

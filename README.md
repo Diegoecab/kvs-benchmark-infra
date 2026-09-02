@@ -13,6 +13,8 @@ The clean distributed environment is split into two independently stateful Terra
 
 The nine load generators expose no ingress. OCI runners have distinct private VNIC addresses and route supported OCI data-plane traffic through a Service Gateway; AWS runners retain independently controlled identities. The benchmark distributes, rather than multiplies, the aggregate offered load across three source VMs per target. AWS Systems Manager and OCI Compute Run Command remain the only control paths.
 
+Normal deployments use promoted, provider-specific runner images so package installation and the immutable container download occur once per image release, not once per VM or benchmark. See [`images/`](images/README.md) for the image contract, Packer templates, promotion gates, and five-minute readiness budget.
+
 No SSH, SCP, inbound public access, cross-region resources, or benchmark execution belongs here.
 
 The first controlled OCI deployment is recorded in [`docs/deployments/20260901-runner-replacement.md`](docs/deployments/20260901-runner-replacement.md). Its databases, tables, buckets, VCN, and previous runners are deliberately outside Terraform state.

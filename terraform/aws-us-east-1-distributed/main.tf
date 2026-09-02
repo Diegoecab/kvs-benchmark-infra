@@ -9,7 +9,7 @@ data "aws_subnet" "selected" {
 }
 
 data "aws_ami" "ubuntu" {
-  count       = var.ubuntu_ami_id == null ? 1 : 0
+  count       = var.runner_ami_id == null && var.ubuntu_ami_id == null ? 1 : 0
   most_recent = true
   owners      = ["099720109477"]
 
@@ -31,12 +31,19 @@ data "aws_ami" "ubuntu" {
 
 locals {
   runner_count = 3
-  runner_ami   = coalesce(var.ubuntu_ami_id, try(data.aws_ami.ubuntu[0].id, null))
+  runner_ami   = coalesce(var.runner_ami_id, var.ubuntu_ami_id, try(data.aws_ami.ubuntu[0].id, null))
   common_tags = merge(var.tags, {
     ManagedBy = "Terraform"
     Purpose   = "Distributed KVS benchmark"
     RunId     = var.run_id
   })
+}
+
+check "prebaked_ami_is_explicit" {
+  assert {
+    condition     = var.runner_bootstrap_mode != "prebaked" || var.runner_ami_id != null
+    error_message = "prebaked mode requires an explicitly pinned promoted AMI ID."
+  }
 }
 
 resource "aws_dynamodb_table" "benchmark" {
@@ -232,10 +239,11 @@ resource "aws_instance" "runner" {
   monitoring                  = true
   user_data_replace_on_change = true
   user_data = templatefile("${path.module}/cloud-init/runner.yaml.tftpl", {
-    region       = var.region
-    run_id       = var.run_id
-    runner_image = var.runner_image
-    runner_index = count.index + 1
+    bootstrap_mode = var.runner_bootstrap_mode
+    region         = var.region
+    run_id         = var.run_id
+    runner_image   = var.runner_image
+    runner_index   = count.index + 1
   })
 
   metadata_options {

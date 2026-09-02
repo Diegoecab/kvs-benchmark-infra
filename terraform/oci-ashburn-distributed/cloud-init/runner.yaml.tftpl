@@ -1,14 +1,8 @@
 #cloud-config
-package_update: true
-packages:
-  - chrony
-  - jq
-  - podman
-  - tar
-  - gzip
+package_update: false
 
-# The benchmark deliberately uses 1 GiB runners. Bring up swap before dnf and
-# Podman so cloud-init cannot starve the Oracle Cloud Agent during bootstrap.
+# The benchmark deliberately uses 1 GiB runners. The promoted image already
+# contains this swap file; the install path creates it before dnf starts.
 bootcmd:
   - [bash, -lc, "test -f /var/swapfile || fallocate -l 2G /var/swapfile"]
   - [chmod, "0600", /var/swapfile]
@@ -17,29 +11,52 @@ bootcmd:
   - [bash, -lc, "grep -q '^/var/swapfile ' /etc/fstab || echo '/var/swapfile none swap defaults 0 0' >> /etc/fstab"]
 
 write_files:
-  - path: /etc/sudoers.d/101-oracle-cloud-agent-kvs-benchmark
-    owner: root:root
-    permissions: "0440"
-    content: |
-      ocarun ALL=(root) NOPASSWD: /usr/bin/podman *, /usr/bin/mkdir *, /usr/bin/chmod *, /usr/bin/chown *, /usr/bin/install *, /usr/bin/chronyc *, /usr/bin/jq *
   - path: /etc/kvs-benchmark-runner-release
     owner: root:root
     permissions: "0444"
     content: |
-      schemaVersion=1
+      schemaVersion=2
       runnerType=oci-kvs-benchmark
+      bootstrapMode=${bootstrap_mode}
       runId=${run_id}
       target=${target}
       sourceIndex=${source}
       image=${runner_image}
+  - path: /usr/local/sbin/kvs-runner-bootstrap
+    owner: root:root
+    permissions: "0700"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      runner_image='${runner_image}'
+      bootstrap_mode='${bootstrap_mode}'
+
+      if [[ "$bootstrap_mode" == "install" ]]; then
+        dnf install -y chrony jq podman tar gzip
+        podman pull "$runner_image"
+      else
+        test -r /etc/kvs-benchmark-image-release
+        grep -Fx "provider=oci" /etc/kvs-benchmark-image-release
+        grep -Fx "runnerImage=$runner_image" /etc/kvs-benchmark-image-release
+      fi
+
+      cat > /etc/sudoers.d/101-oracle-cloud-agent-kvs-benchmark <<'SUDOERS'
+      ocarun ALL=(root) NOPASSWD: /usr/bin/podman *, /usr/bin/mkdir *, /usr/bin/chmod *, /usr/bin/chown *, /usr/bin/install *, /usr/bin/chronyc *, /usr/bin/jq *
+      SUDOERS
+      chmod 0440 /etc/sudoers.d/101-oracle-cloud-agent-kvs-benchmark
+
+      systemctl enable --now chronyd
+      systemctl enable --now oracle-cloud-agent
+      getent passwd ocarun >/dev/null
+      getent group oracle-cloud-agent >/dev/null
+      install -d -o root -g oracle-cloud-agent -m 0750 /opt/kvs-dashboard
+      install -d -o root -g oracle-cloud-agent -m 0750 /opt/kvs-dashboard/results
+      visudo -cf /etc/sudoers.d/101-oracle-cloud-agent-kvs-benchmark
+      podman image exists "$runner_image"
+      sudo -u ocarun sudo -n /usr/bin/podman image exists "$runner_image"
+      chronyc tracking >/dev/null
+      touch /var/lib/cloud/instance/kvs-benchmark-ready
 
 runcmd:
-  - [systemctl, enable, --now, chronyd]
-  - [systemctl, enable, --now, oracle-cloud-agent]
-  - [install, -d, -o, root, -g, ocarun, -m, "0750", /opt/kvs-dashboard]
-  - [install, -d, -o, root, -g, ocarun, -m, "0750", /opt/kvs-dashboard/results]
-  - [visudo, -cf, /etc/sudoers.d/101-oracle-cloud-agent-kvs-benchmark]
-  - [podman, pull, "${runner_image}"]
-  - [bash, -lc, "sudo -u ocarun sudo -n /usr/bin/podman image exists '${runner_image}'"]
-  - [bash, -lc, "chronyc tracking >/dev/null"]
-  - [touch, /var/lib/cloud/instance/kvs-benchmark-ready]
+  - [/usr/local/sbin/kvs-runner-bootstrap]

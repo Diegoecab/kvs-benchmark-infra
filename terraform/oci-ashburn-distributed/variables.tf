@@ -32,9 +32,20 @@ variable "availability_domain" {
 }
 
 variable "instance_image_ocid" {
-  description = "Oracle Linux image OCID in us-ashburn-1 compatible with VM.Standard.E5.Flex."
+  description = "Pinned platform or promoted benchmark-runner image OCID in us-ashburn-1 compatible with VM.Standard.E5.Flex."
   type        = string
   sensitive   = true
+}
+
+variable "runner_bootstrap_mode" {
+  description = "install performs the one-time package/image bootstrap; prebaked requires a promoted image whose embedded manifest matches runner_image."
+  type        = string
+  default     = "install"
+
+  validation {
+    condition     = contains(["install", "prebaked"], var.runner_bootstrap_mode)
+    error_message = "runner_bootstrap_mode must be install or prebaked."
+  }
 }
 
 variable "run_id" {
@@ -61,7 +72,7 @@ variable "private_subnet_cidr" {
 }
 
 variable "bootstrap_internet_access_enabled" {
-  description = "Temporarily allow outbound internet through NAT to install packages and pull the pinned GHCR image. Set false and re-apply before any measured workload."
+  description = "Temporarily allow outbound internet through NAT for install-mode bootstrap. A promoted prebaked image should use false from first boot."
   type        = bool
   default     = true
 }

@@ -1,0 +1,6 @@
+aws_profile  = "<aws-profile>"
+region       = "us-east-1"
+subnet_id    = "<image-builder-subnet-id>"
+base_ami_id  = "<pinned-amazon-linux-2023-ami-id>"
+runner_image = "ghcr.io/example/kvs-benchmark-runner@sha256:<64-hex-digest>"
+

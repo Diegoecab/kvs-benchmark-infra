@@ -11,3 +11,5 @@ override.tf.json
 .DS_Store
 Thumbs.db
 terraform/oci/outputs.json
+images/*.pkrvars.hcl
+images/manifest-*.json

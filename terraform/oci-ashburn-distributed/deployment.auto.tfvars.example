@@ -7,9 +7,13 @@ compartment_ocid     = "<compartment-ocid>"
 availability_domain = "<availability-domain>"
 instance_image_ocid  = "<oracle-linux-image-ocid>"
 
+# Normal benchmark deployments pin a promoted image and use the fast path.
+# Use install only while constructing or diagnosing a new image release.
+runner_bootstrap_mode = "prebaked"
+
 # Keep true only through package/image bootstrap. Set false and apply before
 # service-access validation and every measured benchmark workload.
-bootstrap_internet_access_enabled = true
+bootstrap_internet_access_enabled = false
 
 # The post-apply runner bootstrap creates this fresh DynamoDB API table.
 adb_api_table_name = "kvs_bm_ashburn_distributed_01_adbapi"

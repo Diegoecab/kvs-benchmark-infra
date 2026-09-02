@@ -5,7 +5,7 @@ This isolated Terraform root module creates a fresh, same-region benchmark envir
 - one dedicated VCN, private subnet, Service Gateway, bootstrap NAT Gateway, route table, and security list;
 - no ingress security rules and only HTTPS, DNS, and NTP egress;
 - exactly six `VM.Standard.E5.Flex` load generators at 1 OCPU and 1 GiB each;
-- 2 GiB of boot-volume swap initialized before package installation to protect the OCI agent on the deliberately small runners;
+- 2 GiB of boot-volume swap in the promoted image to protect the OCI agent on the deliberately small runners;
 - three independently addressed runners for ADB DynamoDB API and three for OCI NoSQL;
 - OCI Run Command and Compute Instance Monitoring enabled on every runner;
 - an immutable benchmark container image pinned by SHA-256 digest;
@@ -16,7 +16,7 @@ This isolated Terraform root module creates a fresh, same-region benchmark envir
 
 Each runner receives only a private VNIC address. The module checks that all six private addresses are distinct and outputs the three sources under each target. The security list exposes no inbound path; runner control is through the OCI agent.
 
-The route to **All regional services in Oracle Services Network** is more specific than the default route and sends ADB, OCI NoSQL, Object Storage, and OCI control traffic through the Service Gateway. The NAT Gateway exists only so cloud-init can install packages and pull the immutable image from GHCR. After all six readiness markers exist, set `bootstrap_internet_access_enabled=false`, apply that one-property change, and verify service access with NAT blocked before launching any measured workload. This makes a shared public egress impossible during the benchmark while retaining a reproducible bootstrap.
+The route to **All regional services in Oracle Services Network** is more specific than the default route and sends ADB, OCI NoSQL, Object Storage, and OCI control traffic through the Service Gateway. With a promoted image, set `runner_bootstrap_mode="prebaked"` and `bootstrap_internet_access_enabled=false` from first boot: cloud-init validates the embedded digest and never reaches a package repository or registry. The NAT resource remains only as an explicit recovery path for `install` mode and stays blocked throughout measurement.
 
 ## IAM mode
 
@@ -39,13 +39,13 @@ The OCI Terraform provider creates ADB and enables its DynamoDB API feature tag,
 ## Safe workflow
 
 1. Copy `deployment.auto.tfvars.example` to the ignored `deployment.auto.tfvars` and populate exact values.
-2. Confirm the chosen Oracle Linux image supports `VM.Standard.E5.Flex` in `us-ashburn-1`.
+2. Pin a promoted runner image compatible with `VM.Standard.E5.Flex` in `us-ashburn-1`. New base images and runner digests must pass the six-runner promotion test in [`../../images/`](../../images/README.md); Oracle Linux 9.8 `2026.08.14-0` intermittently remained in initramfs before mounting its root volume during this deployment.
 3. Run `terraform init` and `terraform validate`.
 4. Save and review `terraform plan -out=ashburn-distributed.tfplan`; confirm it creates six runners and fresh data resources.
 5. Apply only after approval of that exact saved plan. This repository does not auto-apply.
 6. Bootstrap the ADB DynamoDB API credential and table outside Terraform, then install credentials only on the three ADB runners.
 7. Require all six readiness markers, clocks, agents, image digests, distinct private IP identities, service access, and evidence upload checks to pass.
-8. Set `bootstrap_internet_access_enabled=false`, apply, and repeat service-access checks with the NAT Gateway blocked.
+8. Require `bootstrap_internet_access_enabled=false` and repeat service-access checks with the NAT Gateway blocked.
 9. Export `terraform output -json infrastructure_contract` and combine it with the AWS fragment for the benchmark control plane.
 
 No teardown is automatic. Stop or destroy resources only after benchmark evidence has been packaged and a separate cleanup plan has been reviewed.

@@ -6,8 +6,9 @@ write_files:
     owner: root:root
     permissions: "0444"
     content: |
-      schemaVersion=1
+      schemaVersion=2
       runnerType=aws-kvs-benchmark
+      bootstrapMode=${bootstrap_mode}
       runId=${run_id}
       source=source-${format("%02d", runner_index)}
       image=${runner_image}
@@ -18,24 +19,31 @@ write_files:
       #!/usr/bin/env bash
       set -euo pipefail
 
-      sed -i 's|http://|https://|g' /etc/apt/sources.list 2>/dev/null || true
-      sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || true
-      apt-get update
-      DEBIAN_FRONTEND=noninteractive apt-get install -y awscli chrony curl podman
-      ln -sfn "$(command -v aws)" /usr/local/bin/aws
+      runner_image='${runner_image}'
+      bootstrap_mode='${bootstrap_mode}'
 
-      if ! systemctl list-unit-files | grep -q amazon-ssm-agent; then
-        curl -fsSL 'https://s3.${region}.amazonaws.com/amazon-ssm-${region}/latest/debian_amd64/amazon-ssm-agent.deb' -o /tmp/amazon-ssm-agent.deb
-        dpkg -i /tmp/amazon-ssm-agent.deb
+      if [[ "$bootstrap_mode" == "install" ]]; then
+        sed -i 's|http://|https://|g' /etc/apt/sources.list 2>/dev/null || true
+        sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || true
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install -y awscli chrony curl podman
+        ln -sfn "$(command -v aws)" /usr/local/bin/aws
+        if ! systemctl list-unit-files | grep -q amazon-ssm-agent; then
+          curl -fsSL 'https://s3.${region}.amazonaws.com/amazon-ssm-${region}/latest/debian_amd64/amazon-ssm-agent.deb' -o /tmp/amazon-ssm-agent.deb
+          dpkg -i /tmp/amazon-ssm-agent.deb
+        fi
+        podman pull "$runner_image"
+      else
+        test -r /etc/kvs-benchmark-image-release
+        grep -Fx "provider=aws" /etc/kvs-benchmark-image-release
+        grep -Fx "runnerImage=$runner_image" /etc/kvs-benchmark-image-release
       fi
-      systemctl enable --now amazon-ssm-agent.service || systemctl enable --now snap.amazon-ssm-agent.amazon-ssm-agent.service
-      systemctl enable --now chrony
 
+      systemctl enable --now amazon-ssm-agent.service || systemctl enable --now snap.amazon-ssm-agent.amazon-ssm-agent.service
+      systemctl enable --now chrony || systemctl enable --now chronyd
       install -d -o root -g root -m 0755 /opt/kvs-dashboard
       install -d -o root -g root -m 0755 /opt/kvs-dashboard/${run_id}
-      podman pull '${runner_image}'
-      podman image exists '${runner_image}'
-
+      podman image exists "$runner_image"
       aws --version
       chronyc tracking >/dev/null
       systemctl is-active --quiet amazon-ssm-agent.service || systemctl is-active --quiet snap.amazon-ssm-agent.amazon-ssm-agent.service
