@@ -1,0 +1,15 @@
+aws_profile       = "default"
+region            = "us-east-1"
+availability_zone = "us-east-1a"
+vpc_id            = "vpc-0123456789abcdef0"
+subnet_id         = "subnet-0123456789abcdef0"
+run_id            = "kvs-distributed-001"
+
+# Optional: pin the exact Canonical Ubuntu AMI as well as the required runner image digest.
+# ubuntu_ami_id = "ami-0123456789abcdef0"
+# runner_image  = "ghcr.io/example/kvs-benchmark-runner@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+tags = {
+  Environment = "benchmark"
+  Owner       = "performance-engineering"
+}

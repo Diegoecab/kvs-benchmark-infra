@@ -1,50 +1,158 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Diegoecab/kvs-benchmark-infra/contracts/benchmark-infrastructure.schema.json",
-  "title": "KVS benchmark infrastructure outputs",
+  "title": "KVS benchmark distributed infrastructure outputs",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "runId", "targets"],
+  "required": ["schemaVersion", "runId", "loadGeneratorCount", "targets"],
   "properties": {
-    "schemaVersion": { "const": 1 },
-    "runId": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "schemaVersion": { "const": 2 },
+    "runId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,36}$" },
+    "loadGeneratorCount": { "type": "integer", "minimum": 1, "maximum": 32 },
+    "runnerImage": { "type": "string", "pattern": "@sha256:[a-f0-9]{64}$" },
     "targets": {
       "type": "object",
       "additionalProperties": false,
+      "minProperties": 1,
       "properties": {
         "aws": { "$ref": "#/$defs/awsTarget" },
-        "adb": { "$ref": "#/$defs/ociTarget" },
-        "ndcs": { "$ref": "#/$defs/ociTarget" }
+        "adb": { "$ref": "#/$defs/adbTarget" },
+        "ndcs": { "$ref": "#/$defs/ndcsTarget" }
       }
     }
   },
   "$defs": {
-    "baseTarget": {
+    "runnerBase": {
       "type": "object",
-      "required": ["region", "runnerId", "resource", "evidenceBucket"],
+      "additionalProperties": false,
+      "required": ["id", "displayName", "source", "shape", "vcpus", "memoryGiB", "privateIp", "publicIp"],
+      "properties": {
+        "id": { "type": "string" },
+        "displayName": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "pattern": "^source-[0-9]{2}$" },
+        "shape": { "type": "string", "minLength": 1 },
+        "vcpus": { "type": "number", "exclusiveMinimum": 0 },
+        "memoryGiB": { "type": "number", "exclusiveMinimum": 0 },
+        "privateIp": { "type": "string", "format": "ipv4" },
+        "publicIp": { "type": "string", "format": "ipv4" },
+        "region": { "type": "string" },
+        "availabilityZone": { "type": "string" },
+        "availabilityDomain": { "type": "string" },
+        "compartmentId": { "type": "string", "pattern": "^ocid1\\.(compartment|tenancy)\\." }
+      }
+    },
+    "awsRunner": {
+      "allOf": [
+        { "$ref": "#/$defs/runnerBase" },
+        {
+          "properties": {
+            "id": { "pattern": "^i-[a-f0-9]+$" },
+            "availabilityZone": { "const": "us-east-1a" }
+          },
+          "required": ["availabilityZone"]
+        }
+      ]
+    },
+    "ociRunner": {
+      "allOf": [
+        { "$ref": "#/$defs/runnerBase" },
+        {
+          "properties": {
+            "id": { "pattern": "^ocid1\\.instance\\." },
+            "compartmentId": { "pattern": "^ocid1\\.(compartment|tenancy)\\." }
+          },
+          "required": ["availabilityDomain", "compartmentId"]
+        }
+      ]
+    },
+    "targetBase": {
+      "type": "object",
+      "required": ["region", "resource", "evidenceBucket", "runners"],
       "properties": {
         "region": { "type": "string" },
-        "runnerId": { "type": "string" },
-        "resource": { "type": "string" },
-        "evidenceBucket": { "type": "string" }
+        "resource": { "type": "string", "minLength": 1 },
+        "evidenceBucket": { "type": "string", "minLength": 1 },
+        "runners": { "type": "array", "minItems": 1, "maxItems": 32 }
       }
     },
     "awsTarget": {
       "allOf": [
-        { "$ref": "#/$defs/baseTarget" },
-        { "properties": { "region": { "const": "us-east-1" }, "runnerId": { "pattern": "^i-[a-f0-9]+$" } } }
+        { "$ref": "#/$defs/targetBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provider", "region", "availabilityZone", "resource", "resourceArn", "evidenceBucket", "runners"],
+          "properties": {
+            "provider": { "const": "aws" },
+            "region": { "const": "us-east-1" },
+            "availabilityZone": { "const": "us-east-1a" },
+            "resource": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+            "resourceArn": { "type": "string", "pattern": "^arn:aws:dynamodb:us-east-1:" },
+            "evidenceBucket": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$" },
+            "runners": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/awsRunner" } }
+          }
+        }
       ]
     },
-    "ociTarget": {
+    "ociTargetBase": {
       "allOf": [
-        { "$ref": "#/$defs/baseTarget" },
+        { "$ref": "#/$defs/targetBase" },
         {
-          "required": ["runnerCompartmentId", "compartmentId"],
+          "type": "object",
+          "required": ["provider", "compartmentId"],
           "properties": {
-            "region": { "enum": ["us-ashburn-1", "us-dallas-1"] },
-            "runnerId": { "pattern": "^ocid1\\.instance\\." },
-            "runnerCompartmentId": { "pattern": "^ocid1\\.(compartment|tenancy)\\." },
-            "compartmentId": { "pattern": "^ocid1\\.compartment\\." }
+            "provider": { "const": "oci" },
+            "region": { "const": "us-ashburn-1" },
+            "compartmentId": { "type": "string", "pattern": "^ocid1\\.compartment\\." },
+            "evidenceBucket": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+            "runners": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/ociRunner" } }
+          }
+        }
+      ]
+    },
+    "adbTarget": {
+      "allOf": [
+        { "$ref": "#/$defs/ociTargetBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provider", "region", "compartmentId", "resource", "evidenceBucket", "runners", "databaseId", "databaseVersion", "workload", "computeModel", "computeCount", "licenseModel", "autoscalingEnabled"],
+          "properties": {
+            "provider": { "const": "oci" },
+            "region": { "const": "us-ashburn-1" },
+            "compartmentId": { "type": "string", "pattern": "^ocid1\\.compartment\\." },
+            "resource": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+            "evidenceBucket": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+            "runners": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/ociRunner" } },
+            "databaseId": { "type": "string", "pattern": "^ocid1\\.autonomousdatabase\\." },
+            "databaseVersion": { "const": "26ai" },
+            "workload": { "const": "OLTP" },
+            "computeModel": { "const": "ECPU" },
+            "computeCount": { "const": 8 },
+            "licenseModel": { "const": "BRING_YOUR_OWN_LICENSE" },
+            "autoscalingEnabled": { "const": false }
+          }
+        }
+      ]
+    },
+    "ndcsTarget": {
+      "allOf": [
+        { "$ref": "#/$defs/ociTargetBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provider", "region", "compartmentId", "resource", "resourceId", "evidenceBucket", "runners", "readUnits", "writeUnits", "storageGiB"],
+          "properties": {
+            "provider": { "const": "oci" },
+            "region": { "const": "us-ashburn-1" },
+            "compartmentId": { "type": "string", "pattern": "^ocid1\\.compartment\\." },
+            "resource": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]{0,255}$" },
+            "resourceId": { "type": "string", "pattern": "^ocid1\\.nosqltable\\." },
+            "evidenceBucket": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+            "runners": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/ociRunner" } },
+            "readUnits": { "const": 1000 },
+            "writeUnits": { "const": 1000 },
+            "storageGiB": { "const": 10 }
           }
         }
       ]

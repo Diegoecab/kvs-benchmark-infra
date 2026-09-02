@@ -1,0 +1,45 @@
+#cloud-config
+package_update: false
+
+write_files:
+  - path: /etc/kvs-benchmark-runner-release
+    owner: root:root
+    permissions: "0444"
+    content: |
+      schemaVersion=1
+      runnerType=aws-kvs-benchmark
+      runId=${run_id}
+      source=source-${format("%02d", runner_index)}
+      image=${runner_image}
+  - path: /usr/local/sbin/kvs-runner-bootstrap
+    owner: root:root
+    permissions: "0700"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      sed -i 's|http://|https://|g' /etc/apt/sources.list 2>/dev/null || true
+      sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || true
+      apt-get update
+      DEBIAN_FRONTEND=noninteractive apt-get install -y awscli chrony curl podman
+      ln -sfn "$(command -v aws)" /usr/local/bin/aws
+
+      if ! systemctl list-unit-files | grep -q amazon-ssm-agent; then
+        curl -fsSL 'https://s3.${region}.amazonaws.com/amazon-ssm-${region}/latest/debian_amd64/amazon-ssm-agent.deb' -o /tmp/amazon-ssm-agent.deb
+        dpkg -i /tmp/amazon-ssm-agent.deb
+      fi
+      systemctl enable --now amazon-ssm-agent.service || systemctl enable --now snap.amazon-ssm-agent.amazon-ssm-agent.service
+      systemctl enable --now chrony
+
+      install -d -o root -g root -m 0755 /opt/kvs-dashboard
+      install -d -o root -g root -m 0755 /opt/kvs-dashboard/${run_id}
+      podman pull '${runner_image}'
+      podman image exists '${runner_image}'
+
+      aws --version
+      chronyc tracking >/dev/null
+      systemctl is-active --quiet amazon-ssm-agent.service || systemctl is-active --quiet snap.amazon-ssm-agent.amazon-ssm-agent.service
+      touch /var/lib/cloud/instance/kvs-benchmark-ready
+
+runcmd:
+  - [/usr/local/sbin/kvs-runner-bootstrap]

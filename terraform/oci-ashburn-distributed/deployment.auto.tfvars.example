@@ -1,0 +1,25 @@
+# Copy to deployment.auto.tfvars. The populated file is ignored by Git.
+oci_profile         = "<oci-cli-profile>"
+region              = "us-ashburn-1"
+run_id              = "ashburn-distributed-01"
+tenancy_ocid         = "<tenancy-ocid>"
+compartment_ocid     = "<compartment-ocid>"
+availability_domain = "<availability-domain>"
+instance_image_ocid  = "<oracle-linux-image-ocid>"
+
+# The post-apply runner bootstrap creates this fresh DynamoDB API table.
+adb_api_table_name = "kvs_bm_ashburn_distributed_01_adbapi"
+
+# Use a secret injection mechanism or an ignored tfvars file. This value is
+# sensitive in CLI output but Terraform still stores it in state.
+adb_admin_password = "<strong-adb-admin-password>"
+
+# Reuse tenancy IAM by default. The existing dynamic group must match all six
+# runner OCIDs, and the policy must cover Run Command execution, the evidence
+# bucket, and OCI NoSQL table/row access.
+create_tenancy_iam_resources = false
+existing_dynamic_group_name  = "<existing-dynamic-group>"
+existing_policy_name         = "<existing-policy>"
+
+# Set create_tenancy_iam_resources=true only after reviewing and approving the
+# optional tenancy-level dynamic group and policy in this root module.

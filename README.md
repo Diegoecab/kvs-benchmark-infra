@@ -6,12 +6,12 @@ This repository owns cloud resources only. It does not implement workloads, calc
 
 ## Current milestone
 
-The repository contains an executable OCI replacement-runner stack and the versioned dashboard contract. The AWS stack remains planned; existing AWS infrastructure is still discovered read-only by the benchmark dashboard.
+The clean distributed environment is split into two independently stateful Terraform roots:
 
-Planned provider stacks:
+- [`terraform/aws-us-east-1-distributed/`](terraform/aws-us-east-1-distributed/README.md) creates a fresh DynamoDB table, private S3 evidence bucket, and three same-size load generators in `us-east-1a`.
+- [`terraform/oci-ashburn-distributed/`](terraform/oci-ashburn-distributed/README.md) creates a fresh OCI NoSQL table, a fresh Autonomous AI Database 26ai with DynamoDB API enabled, a private Object Storage evidence bucket, and three same-size load generators per OCI target in `us-ashburn-1`.
 
-- AWS `us-east-1`: private runner controlled by Systems Manager, DynamoDB table, private S3 evidence bucket, and least-privilege IAM.
-- OCI `us-ashburn-1` or `us-dallas-1`: private runners controlled by Compute Run Command, ADB DynamoDB API and/or OCI NoSQL destinations, private Object Storage evidence buckets, dynamic groups, and least-privilege policies.
+The nine load generators expose no ingress. Each one has a distinct controlled egress address so the benchmark can distribute, rather than multiply, the aggregate offered load across three source IPs per target. AWS Systems Manager and OCI Compute Run Command remain the only control paths.
 
 No SSH, SCP, inbound public access, cross-region resources, or benchmark execution belongs here.
 
@@ -23,6 +23,6 @@ The first controlled OCI deployment is recorded in [`docs/deployments/20260901-r
 - `terraform plan`, `apply`, and `destroy` are separate dashboard approvals.
 - Existing resources are data sources only and cannot be adopted or destroyed.
 - Outputs contain identifiers and endpoints, never credentials.
-- Teardown is never automatic; the user must explicitly approve it after evidence is packaged.
+- Teardown is never automatic; it is performed only after evidence is packaged and the exact cleanup scope is approved.
 
 See [`docs/integration-contract.md`](docs/integration-contract.md) for the dashboard handoff.
