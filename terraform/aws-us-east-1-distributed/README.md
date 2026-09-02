@@ -9,6 +9,7 @@ This isolated Terraform root module creates one AWS DynamoDB target and three in
 - Exactly three `t3.micro` runners (2 vCPU, 1 GiB each), each with its own Elastic IP, unlimited CPU credits, and one-minute EC2 monitoring.
 - One no-ingress security group. Egress is limited to HTTPS, VPC DNS, and Amazon Time Sync NTP.
 - One EC2 role and instance profile: the standard SSM managed-instance policy plus table-scoped `DescribeTable`/`GetItem`/`PutItem` and write-only access below the bucket's `results/` evidence prefix.
+- If the selected subnet routes DynamoDB through a pre-existing gateway endpoint, that endpoint policy must also include the newly created table ARN. The benchmark preflight checks this from every runner, before preload, and reports the stale endpoint policy explicitly.
 
 A promoted AMI already contains Podman, AWS CLI, chrony, the SSM agent, and the immutable runner image by digest. In `prebaked` mode cloud-init only validates that manifest, starts services, checks clock synchronization, and writes the readiness marker. Package installation and registry downloads are reserved for image construction or recovery.
 
