@@ -34,7 +34,12 @@
         "vcpus": { "type": "number", "exclusiveMinimum": 0 },
         "memoryGiB": { "type": "number", "exclusiveMinimum": 0 },
         "privateIp": { "type": "string", "format": "ipv4" },
-        "publicIp": { "type": "string", "format": "ipv4" },
+        "publicIp": {
+          "oneOf": [
+            { "type": "string", "format": "ipv4" },
+            { "type": "null" }
+          ]
+        },
         "region": { "type": "string" },
         "availabilityZone": { "type": "string" },
         "availabilityDomain": { "type": "string" },

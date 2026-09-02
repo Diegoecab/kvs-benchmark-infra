@@ -54,10 +54,16 @@ variable "vcn_cidr" {
   default     = "10.96.0.0/16"
 }
 
-variable "public_subnet_cidr" {
-  description = "CIDR for the public runner subnet."
+variable "private_subnet_cidr" {
+  description = "CIDR for the private runner subnet."
   type        = string
   default     = "10.96.1.0/24"
+}
+
+variable "bootstrap_internet_access_enabled" {
+  description = "Temporarily allow outbound internet through NAT to install packages and pull the pinned GHCR image. Set false and re-apply before any measured workload."
+  type        = bool
+  default     = true
 }
 
 variable "runner_image" {

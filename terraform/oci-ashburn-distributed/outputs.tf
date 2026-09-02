@@ -9,7 +9,7 @@ locals {
         vcpus              = oci_core_instance.runner[key].shape_config[0].ocpus * 2
         memoryGiB          = oci_core_instance.runner[key].shape_config[0].memory_in_gbs
         privateIp          = oci_core_instance.runner[key].private_ip
-        publicIp           = oci_core_instance.runner[key].public_ip
+        publicIp           = null
         availabilityDomain = var.availability_domain
         compartmentId      = var.compartment_ocid
       } if local.runner_matrix[key].target == target
@@ -26,7 +26,7 @@ output "runners_by_target" {
         source_index   = local.runner_matrix[key].source
         instance_id    = oci_core_instance.runner[key].id
         display_name   = oci_core_instance.runner[key].display_name
-        public_ip      = oci_core_instance.runner[key].public_ip
+        public_ip      = null
         private_ip     = oci_core_instance.runner[key].private_ip
         shape          = oci_core_instance.runner[key].shape
         ocpus          = oci_core_instance.runner[key].shape_config[0].ocpus
@@ -121,12 +121,14 @@ output "evidence_bucket" {
 }
 
 output "network" {
-  description = "Dedicated network metadata for the distributed runners."
+  description = "Private network metadata for the distributed runners."
   value = {
-    vcn_id              = oci_core_vcn.benchmark.id
-    subnet_id           = oci_core_subnet.runner_public.id
-    internet_gateway_id = oci_core_internet_gateway.benchmark.id
-    security_list_id    = oci_core_security_list.runner_public.id
+    vcn_id                            = oci_core_vcn.benchmark.id
+    subnet_id                         = oci_core_subnet.runner_private.id
+    service_gateway_id                = oci_core_service_gateway.benchmark.id
+    bootstrap_nat_gateway_id          = oci_core_nat_gateway.bootstrap.id
+    bootstrap_internet_access_enabled = var.bootstrap_internet_access_enabled
+    security_list_id                  = oci_core_security_list.runner_private.id
   }
 }
 
@@ -154,7 +156,7 @@ output "deployment" {
         runners = [for key in sort(keys(local.runner_matrix)) : {
           source_index = local.runner_matrix[key].source
           runner_id    = oci_core_instance.runner[key].id
-          public_ip    = oci_core_instance.runner[key].public_ip
+          public_ip    = null
           private_ip   = oci_core_instance.runner[key].private_ip
         } if local.runner_matrix[key].target == "adb"]
       }
@@ -164,7 +166,7 @@ output "deployment" {
         runners = [for key in sort(keys(local.runner_matrix)) : {
           source_index = local.runner_matrix[key].source
           runner_id    = oci_core_instance.runner[key].id
-          public_ip    = oci_core_instance.runner[key].public_ip
+          public_ip    = null
           private_ip   = oci_core_instance.runner[key].private_ip
         } if local.runner_matrix[key].target == "ndcs"]
       }

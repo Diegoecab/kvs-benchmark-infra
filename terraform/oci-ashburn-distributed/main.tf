@@ -31,15 +31,23 @@ check "existing_iam_is_declared" {
   }
 }
 
-check "six_distinct_public_ips" {
+check "six_distinct_private_ips" {
   assert {
-    condition     = length(toset([for runner in oci_core_instance.runner : runner.public_ip])) == 6
-    error_message = "Every load generator must have a distinct public IP."
+    condition     = length(toset([for runner in oci_core_instance.runner : runner.private_ip])) == 6
+    error_message = "Every load generator must have a distinct private IP."
   }
 }
 
 data "oci_objectstorage_namespace" "current" {
   compartment_id = var.tenancy_ocid
+}
+
+data "oci_core_services" "regional_oracle_services" {
+  filter {
+    name   = "name"
+    values = ["All .* Services In Oracle Services Network"]
+    regex  = true
+  }
 }
 
 resource "oci_core_vcn" "benchmark" {
@@ -50,31 +58,50 @@ resource "oci_core_vcn" "benchmark" {
   freeform_tags  = local.common_tags
 }
 
-resource "oci_core_internet_gateway" "benchmark" {
+resource "oci_core_service_gateway" "benchmark" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.benchmark.id
-  display_name   = "${local.name_prefix}-igw"
-  enabled        = true
+  display_name   = "${local.name_prefix}-sgw"
+  freeform_tags  = local.common_tags
+
+  services {
+    service_id = data.oci_core_services.regional_oracle_services.services[0].id
+  }
+}
+
+resource "oci_core_nat_gateway" "bootstrap" {
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.benchmark.id
+  display_name   = "${local.name_prefix}-bootstrap-nat"
+  block_traffic  = !var.bootstrap_internet_access_enabled
   freeform_tags  = local.common_tags
 }
 
-resource "oci_core_route_table" "runner_public" {
+resource "oci_core_route_table" "runner_private" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.benchmark.id
-  display_name   = "${local.name_prefix}-public-rt"
+  display_name   = "${local.name_prefix}-private-rt"
   freeform_tags  = local.common_tags
+
+  route_rules {
+    destination       = data.oci_core_services.regional_oracle_services.services[0].cidr_block
+    destination_type  = "SERVICE_CIDR_BLOCK"
+    network_entity_id = oci_core_service_gateway.benchmark.id
+    description       = "ADB, NoSQL, Object Storage, and OCI control traffic stays on Oracle Services Network"
+  }
 
   route_rules {
     destination       = "0.0.0.0/0"
     destination_type  = "CIDR_BLOCK"
-    network_entity_id = oci_core_internet_gateway.benchmark.id
+    network_entity_id = oci_core_nat_gateway.bootstrap.id
+    description       = "Bootstrap-only access for the immutable GHCR image; blocked before measurement"
   }
 }
 
-resource "oci_core_security_list" "runner_public" {
+resource "oci_core_security_list" "runner_private" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.benchmark.id
-  display_name   = "${local.name_prefix}-public-sl"
+  display_name   = "${local.name_prefix}-private-sl"
   freeform_tags  = local.common_tags
 
   # Intentionally no ingress_security_rules. Runners are controlled only by
@@ -116,17 +143,17 @@ resource "oci_core_security_list" "runner_public" {
   }
 }
 
-resource "oci_core_subnet" "runner_public" {
+resource "oci_core_subnet" "runner_private" {
   compartment_id             = var.compartment_ocid
   vcn_id                     = oci_core_vcn.benchmark.id
-  cidr_block                 = var.public_subnet_cidr
-  display_name               = "${local.name_prefix}-public-subnet"
-  dns_label                  = "runnerpub"
+  cidr_block                 = var.private_subnet_cidr
+  display_name               = "${local.name_prefix}-private-subnet"
+  dns_label                  = "runnerpriv"
   availability_domain        = var.availability_domain
-  prohibit_public_ip_on_vnic = false
-  prohibit_internet_ingress  = false
-  route_table_id             = oci_core_route_table.runner_public.id
-  security_list_ids          = [oci_core_security_list.runner_public.id]
+  prohibit_public_ip_on_vnic = true
+  prohibit_internet_ingress  = true
+  route_table_id             = oci_core_route_table.runner_private.id
+  security_list_ids          = [oci_core_security_list.runner_private.id]
   freeform_tags              = local.common_tags
 }
 
@@ -190,8 +217,8 @@ resource "oci_core_instance" "runner" {
   }
 
   create_vnic_details {
-    subnet_id        = oci_core_subnet.runner_public.id
-    assign_public_ip = true
+    subnet_id        = oci_core_subnet.runner_private.id
+    assign_public_ip = false
     display_name     = "${local.name_prefix}-${each.key}-vnic"
     hostname_label   = "kvs${replace(each.key, "-", "")}"
   }

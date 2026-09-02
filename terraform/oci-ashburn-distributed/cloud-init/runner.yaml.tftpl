@@ -7,6 +7,15 @@ packages:
   - tar
   - gzip
 
+# The benchmark deliberately uses 1 GiB runners. Bring up swap before dnf and
+# Podman so cloud-init cannot starve the Oracle Cloud Agent during bootstrap.
+bootcmd:
+  - [bash, -lc, "test -f /var/swapfile || fallocate -l 2G /var/swapfile"]
+  - [chmod, "0600", /var/swapfile]
+  - [bash, -lc, "mkswap /var/swapfile >/dev/null 2>&1 || true"]
+  - [bash, -lc, "swapon /var/swapfile || true"]
+  - [bash, -lc, "grep -q '^/var/swapfile ' /etc/fstab || echo '/var/swapfile none swap defaults 0 0' >> /etc/fstab"]
+
 write_files:
   - path: /etc/sudoers.d/101-oracle-cloud-agent-kvs-benchmark
     owner: root:root

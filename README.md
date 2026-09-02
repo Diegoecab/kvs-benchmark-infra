@@ -11,7 +11,7 @@ The clean distributed environment is split into two independently stateful Terra
 - [`terraform/aws-us-east-1-distributed/`](terraform/aws-us-east-1-distributed/README.md) creates a fresh DynamoDB table, private S3 evidence bucket, and three same-size load generators in `us-east-1a`.
 - [`terraform/oci-ashburn-distributed/`](terraform/oci-ashburn-distributed/README.md) creates a fresh OCI NoSQL table, a fresh Autonomous AI Database 26ai with DynamoDB API enabled, a private Object Storage evidence bucket, and three same-size load generators per OCI target in `us-ashburn-1`.
 
-The nine load generators expose no ingress. Each one has a distinct controlled egress address so the benchmark can distribute, rather than multiply, the aggregate offered load across three source IPs per target. AWS Systems Manager and OCI Compute Run Command remain the only control paths.
+The nine load generators expose no ingress. OCI runners have distinct private VNIC addresses and route supported OCI data-plane traffic through a Service Gateway; AWS runners retain independently controlled identities. The benchmark distributes, rather than multiplies, the aggregate offered load across three source VMs per target. AWS Systems Manager and OCI Compute Run Command remain the only control paths.
 
 No SSH, SCP, inbound public access, cross-region resources, or benchmark execution belongs here.
 
