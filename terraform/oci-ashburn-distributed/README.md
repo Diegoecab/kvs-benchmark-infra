@@ -2,7 +2,7 @@
 
 This isolated Terraform root module creates a fresh, same-region benchmark environment in `us-ashburn-1`:
 
-- one dedicated VCN, private subnet, Service Gateway, bootstrap NAT Gateway, route table, and security list;
+- one shared private VCN with Service Gateway for OCI NoSQL plus three isolated private VCNs, each with a dedicated NAT, for the ADB API load generators;
 - no ingress security rules and only HTTPS, DNS, and NTP egress;
 - exactly six `VM.Standard.E5.Flex` load generators at 1 OCPU and 1 GiB each;
 - 2 GiB of boot-volume swap in the promoted image to protect the OCI agent on the deliberately small runners;
@@ -14,9 +14,11 @@ This isolated Terraform root module creates a fresh, same-region benchmark envir
 - one fresh Autonomous AI Database 26ai using OLTP, 8 ECPU, 20 GB, BYOL, and no compute or storage autoscaling;
 - the ADB `adb$feature` free-form tag enabling `DynamoDB_API`.
 
-Each runner receives only a private VNIC address. The module checks that all six private addresses are distinct and outputs the three sources under each target. The security list exposes no inbound path; runner control is through the OCI agent.
+Each runner receives only a private VNIC address. The module checks that all six private addresses are distinct and outputs the three sources under each target. The security lists expose no inbound path; runner control is through the OCI agent.
 
-The route to **All regional services in Oracle Services Network** is more specific than the default route and sends ADB, OCI NoSQL, Object Storage, and OCI control traffic through the Service Gateway. With a promoted image, set `runner_bootstrap_mode="prebaked"` and `bootstrap_internet_access_enabled=false` from first boot: cloud-init validates the embedded digest and never reaches a package repository or registry. The NAT resource remains only as an explicit recovery path for `install` mode and stays blocked throughout measurement.
+OCI NoSQL traffic, Object Storage, and OCI control traffic use the shared VCN's Service Gateway. Each ADB API source uses an isolated VCN and dedicated NAT so the remote service observes three independent outbound identities without assigning a public IP to any VM. Terraform exports those NAT addresses and the readiness gate verifies them from inside each runner.
+
+With a promoted image, set `runner_bootstrap_mode="prebaked"` and `bootstrap_internet_access_enabled=false` from first boot: cloud-init validates the embedded digest and does not reach a package repository or registry. Install mode waits for DNS and retries package installation to tolerate the short interval between VM launch and NAT routability. The shared bootstrap NAT remains an explicit recovery path and stays blocked during measurement; the three ADB egress NATs remain available because they are part of the measured data path.
 
 ## IAM mode
 
@@ -44,8 +46,8 @@ The OCI Terraform provider creates ADB and enables its DynamoDB API feature tag,
 4. Save and review `terraform plan -out=ashburn-distributed.tfplan`; confirm it creates six runners and fresh data resources.
 5. Apply only after approval of that exact saved plan. This repository does not auto-apply.
 6. Bootstrap the ADB DynamoDB API credential and table outside Terraform, then install credentials only on the three ADB runners.
-7. Require all six readiness markers, clocks, agents, image digests, distinct private IP identities, service access, and evidence upload checks to pass.
-8. Require `bootstrap_internet_access_enabled=false` and repeat service-access checks with the NAT Gateway blocked.
+7. Require all six readiness markers, clocks, agents, image digests, distinct private IP identities, the three expected ADB egress identities, service access, and evidence upload checks to pass.
+8. Require `bootstrap_internet_access_enabled=false` and repeat service-access checks with the shared bootstrap NAT blocked.
 9. Export `terraform output -json infrastructure_contract` and combine it with the AWS fragment for the benchmark control plane.
 
 No teardown is automatic. Stop or destroy resources only after benchmark evidence has been packaged and a separate cleanup plan has been reviewed.

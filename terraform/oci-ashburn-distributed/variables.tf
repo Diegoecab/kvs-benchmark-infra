@@ -71,6 +71,28 @@ variable "private_subnet_cidr" {
   default     = "10.96.1.0/24"
 }
 
+variable "adb_egress_subnet_cidrs" {
+  description = "Three private /28 subnets, one per isolated ADB load-generator VCN."
+  type        = list(string)
+  default     = ["10.97.1.0/28", "10.97.2.0/28", "10.97.3.0/28"]
+
+  validation {
+    condition     = length(var.adb_egress_subnet_cidrs) == 3 && length(toset(var.adb_egress_subnet_cidrs)) == 3 && alltrue([for cidr in var.adb_egress_subnet_cidrs : can(cidrhost(cidr, 1))])
+    error_message = "adb_egress_subnet_cidrs must contain exactly three distinct valid CIDR blocks."
+  }
+}
+
+variable "adb_egress_vcn_cidrs" {
+  description = "Three isolated VCN CIDRs. OCI permits one NAT gateway per VCN in this tenancy, so each ADB source gets its own VCN and stable outbound identity."
+  type        = list(string)
+  default     = ["10.97.1.0/24", "10.97.2.0/24", "10.97.3.0/24"]
+
+  validation {
+    condition     = length(var.adb_egress_vcn_cidrs) == 3 && length(toset(var.adb_egress_vcn_cidrs)) == 3 && alltrue([for cidr in var.adb_egress_vcn_cidrs : can(cidrhost(cidr, 1))])
+    error_message = "adb_egress_vcn_cidrs must contain exactly three distinct valid CIDR blocks."
+  }
+}
+
 variable "bootstrap_internet_access_enabled" {
   description = "Temporarily allow outbound internet through NAT for install-mode bootstrap. A promoted prebaked image should use false from first boot."
   type        = bool

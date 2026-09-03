@@ -33,7 +33,19 @@ write_files:
       bootstrap_mode='${bootstrap_mode}'
 
       if [[ "$bootstrap_mode" == "install" ]]; then
-        dnf install -y chrony jq podman tar gzip
+        # A newly-created NAT can become routable a few seconds after the VM
+        # starts. Do not let a transient DNS/repository race poison cloud-init.
+        for attempt in $(seq 1 60); do
+          if getent ahostsv4 yum.oracle.com >/dev/null 2>&1; then break; fi
+          sleep 5
+        done
+        getent ahostsv4 yum.oracle.com >/dev/null
+        for attempt in $(seq 1 12); do
+          if dnf install -y chrony jq podman tar gzip; then break; fi
+          if [[ "$attempt" == "12" ]]; then exit 1; fi
+          sleep 15
+        done
+        rpm -q chrony jq podman tar gzip >/dev/null
         podman pull "$runner_image"
       else
         test -r /etc/kvs-benchmark-image-release

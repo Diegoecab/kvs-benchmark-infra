@@ -8,6 +8,11 @@ locals {
     "ndcs-02" = { target = "ndcs", source = "02" }
     "ndcs-03" = { target = "ndcs", source = "03" }
   }
+  adb_egress_networks = {
+    "01" = { vcn_cidr = var.adb_egress_vcn_cidrs[0], subnet_cidr = var.adb_egress_subnet_cidrs[0] }
+    "02" = { vcn_cidr = var.adb_egress_vcn_cidrs[1], subnet_cidr = var.adb_egress_subnet_cidrs[1] }
+    "03" = { vcn_cidr = var.adb_egress_vcn_cidrs[2], subnet_cidr = var.adb_egress_subnet_cidrs[2] }
+  }
   common_tags = {
     ManagedBy = "Terraform"
     Project   = "KVS-Benchmark"
@@ -164,6 +169,108 @@ resource "oci_core_subnet" "runner_private" {
   freeform_tags              = local.common_tags
 }
 
+resource "oci_core_nat_gateway" "adb_egress" {
+  for_each       = local.adb_egress_networks
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.adb_egress[each.key].id
+  display_name   = "${local.name_prefix}-adb-${each.key}-nat"
+  block_traffic  = false
+  freeform_tags = merge(local.common_tags, {
+    Target      = "adb"
+    SourceIndex = each.key
+  })
+}
+
+resource "oci_core_vcn" "adb_egress" {
+  for_each       = local.adb_egress_networks
+  compartment_id = var.compartment_ocid
+  cidr_blocks    = [each.value.vcn_cidr]
+  display_name   = "${local.name_prefix}-adb-${each.key}-vcn"
+  dns_label      = "kvsadb${each.key}"
+  freeform_tags = merge(local.common_tags, {
+    Target      = "adb"
+    SourceIndex = each.key
+  })
+}
+
+resource "oci_core_route_table" "adb_egress" {
+  for_each       = local.adb_egress_networks
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.adb_egress[each.key].id
+  display_name   = "${local.name_prefix}-adb-${each.key}-rt"
+  freeform_tags  = local.common_tags
+
+  route_rules {
+    destination       = "0.0.0.0/0"
+    destination_type  = "CIDR_BLOCK"
+    network_entity_id = oci_core_nat_gateway.adb_egress[each.key].id
+    description       = "Dedicated outbound identity for one ADB API load generator"
+  }
+}
+
+resource "oci_core_security_list" "adb_egress" {
+  for_each       = local.adb_egress_networks
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.adb_egress[each.key].id
+  display_name   = "${local.name_prefix}-adb-${each.key}-sl"
+  freeform_tags  = local.common_tags
+
+  # No ingress. The OCI agent establishes its own outbound control channel.
+  egress_security_rules {
+    destination = "0.0.0.0/0"
+    protocol    = "6"
+    tcp_options {
+      min = 443
+      max = 443
+    }
+  }
+
+  egress_security_rules {
+    destination = "0.0.0.0/0"
+    protocol    = "6"
+    tcp_options {
+      min = 53
+      max = 53
+    }
+  }
+
+  egress_security_rules {
+    destination = "0.0.0.0/0"
+    protocol    = "17"
+    udp_options {
+      min = 53
+      max = 53
+    }
+  }
+
+  egress_security_rules {
+    destination = "0.0.0.0/0"
+    protocol    = "17"
+    udp_options {
+      min = 123
+      max = 123
+    }
+  }
+}
+
+resource "oci_core_subnet" "adb_egress" {
+  for_each                   = local.adb_egress_networks
+  compartment_id             = var.compartment_ocid
+  vcn_id                     = oci_core_vcn.adb_egress[each.key].id
+  cidr_block                 = each.value.subnet_cidr
+  display_name               = "${local.name_prefix}-adb-${each.key}-subnet"
+  dns_label                  = "runner"
+  availability_domain        = var.availability_domain
+  prohibit_public_ip_on_vnic = true
+  prohibit_internet_ingress  = true
+  route_table_id             = oci_core_route_table.adb_egress[each.key].id
+  security_list_ids          = [oci_core_security_list.adb_egress[each.key].id]
+  freeform_tags = merge(local.common_tags, {
+    Target      = "adb"
+    SourceIndex = each.key
+  })
+}
+
 resource "oci_objectstorage_bucket" "evidence" {
   compartment_id = var.compartment_ocid
   namespace      = data.oci_objectstorage_namespace.current.namespace
@@ -224,7 +331,7 @@ resource "oci_core_instance" "runner" {
   }
 
   create_vnic_details {
-    subnet_id        = oci_core_subnet.runner_private.id
+    subnet_id        = each.value.target == "adb" ? oci_core_subnet.adb_egress[each.value.source].id : oci_core_subnet.runner_private.id
     assign_public_ip = false
     display_name     = "${local.name_prefix}-${each.key}-vnic"
     hostname_label   = "kvs${replace(each.key, "-", "")}"
@@ -258,6 +365,13 @@ resource "oci_core_instance" "runner" {
       source         = each.value.source
       run_id         = var.run_id
     }))
+  }
+
+  lifecycle {
+    # An immutable digest is installed and verified separately before promotion.
+    # Do not replace healthy runners merely because cloud-init metadata changed;
+    # image/source or subnet changes still force the intended replacement.
+    ignore_changes = [metadata]
   }
 }
 
