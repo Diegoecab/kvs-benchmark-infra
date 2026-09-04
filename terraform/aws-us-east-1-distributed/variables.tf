@@ -62,6 +62,39 @@ variable "run_id" {
   }
 }
 
+variable "runner_count" {
+  description = "Number of independent AWS load generators for this target."
+  type        = number
+  default     = 3
+
+  validation {
+    condition     = var.runner_count >= 1 && var.runner_count <= 3 && floor(var.runner_count) == var.runner_count
+    error_message = "runner_count must be an integer between 1 and 3."
+  }
+}
+
+variable "read_capacity" {
+  description = "Provisioned DynamoDB read capacity units for the benchmark table."
+  type        = number
+  default     = 500
+
+  validation {
+    condition     = var.read_capacity >= 1
+    error_message = "read_capacity must be positive."
+  }
+}
+
+variable "write_capacity" {
+  description = "Provisioned DynamoDB write capacity units for the benchmark table."
+  type        = number
+  default     = 500
+
+  validation {
+    condition     = var.write_capacity >= 1
+    error_message = "write_capacity must be positive."
+  }
+}
+
 variable "ubuntu_ami_id" {
   description = "Deprecated compatibility input for a pinned Ubuntu 24.04 AMI. Prefer runner_ami_id."
   type        = string

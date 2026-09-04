@@ -30,7 +30,7 @@ data "aws_ami" "ubuntu" {
 }
 
 locals {
-  runner_count = 3
+  runner_count = var.runner_count
   runner_ami   = coalesce(var.runner_ami_id, var.ubuntu_ami_id, try(data.aws_ami.ubuntu[0].id, null))
   common_tags = merge(var.tags, {
     ManagedBy = "Terraform"
@@ -49,8 +49,8 @@ check "prebaked_ami_is_explicit" {
 resource "aws_dynamodb_table" "benchmark" {
   name           = "${var.run_id}-kvs"
   billing_mode   = "PROVISIONED"
-  read_capacity  = 500
-  write_capacity = 500
+  read_capacity  = var.read_capacity
+  write_capacity = var.write_capacity
   hash_key       = "pk"
   range_key      = "sk"
 

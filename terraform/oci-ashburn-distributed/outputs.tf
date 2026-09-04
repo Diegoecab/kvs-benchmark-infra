@@ -47,7 +47,7 @@ output "infrastructure_contract" {
   value = {
     schemaVersion      = 2
     runId              = var.run_id
-    loadGeneratorCount = 3
+    loadGeneratorCount = var.runner_count
     runnerImage        = var.runner_image
     machineImageId     = var.instance_image_ocid
     bootstrapMode      = var.runner_bootstrap_mode
@@ -75,8 +75,8 @@ output "infrastructure_contract" {
         resourceId     = oci_nosql_table.benchmark.id
         evidenceBucket = oci_objectstorage_bucket.evidence.name
         runners        = local.runners_by_target_contract.ndcs
-        readUnits      = 1000
-        writeUnits     = 1000
+        readUnits      = var.nosql_read_units
+        writeUnits     = var.nosql_write_units
         storageGiB     = 10
       }
     }
@@ -107,8 +107,8 @@ output "nosql_table" {
   value = {
     id             = oci_nosql_table.benchmark.id
     name           = oci_nosql_table.benchmark.name
-    read_units     = 1000
-    write_units    = 1000
+    read_units     = var.nosql_read_units
+    write_units    = var.nosql_write_units
     storage_gb     = 10
     compartment_id = var.compartment_ocid
   }

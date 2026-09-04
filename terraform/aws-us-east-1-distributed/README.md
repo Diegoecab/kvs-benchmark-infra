@@ -11,6 +11,15 @@ This isolated Terraform root module creates one AWS DynamoDB target and three in
 - One EC2 role and instance profile: the standard SSM managed-instance policy plus table-scoped `DescribeTable`/`GetItem`/`PutItem` and write-only access below the bucket's `results/` evidence prefix.
 - If the selected subnet routes DynamoDB through a pre-existing gateway endpoint, that endpoint policy must also include the newly created table ARN. The benchmark preflight checks this from every runner, before preload, and reports the stale endpoint policy explicitly.
 
+For a shared gateway endpoint, use the scoped helper instead of replacing its policy by hand. Preview is the default; mutation requires `-Apply` plus an exact, case-sensitive approval string. Run `Add` after Terraform creates the table and `Remove` during cleanup. The helper preserves unrelated statements and resources:
+
+```powershell
+.\scripts\Set-AwsDynamoDbEndpointTableAccess.ps1 `
+  -VpcEndpointId vpce-0123456789abcdef0 `
+  -TableArn arn:aws:dynamodb:us-east-1:123456789012:table/example-kvs `
+  -Action Add -Profile benchmark
+```
+
 A promoted AMI already contains Podman, AWS CLI, chrony, the SSM agent, and the immutable runner image by digest. In `prebaked` mode cloud-init only validates that manifest, starts services, checks clock synchronization, and writes the readiness marker. Package installation and registry downloads are reserved for image construction or recovery.
 
 The configured workload rate remains the aggregate offered load for each target. The dashboard uses `loadGeneratorCount = 3` and deterministically shards that target load across the three source VMs; it does not multiply the requested offered rate by three.

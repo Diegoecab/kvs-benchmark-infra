@@ -1,17 +1,15 @@
 locals {
-  name_prefix = "kvs-${var.run_id}"
-  runner_matrix = {
-    "adb-01"  = { target = "adb", source = "01" }
-    "adb-02"  = { target = "adb", source = "02" }
-    "adb-03"  = { target = "adb", source = "03" }
-    "ndcs-01" = { target = "ndcs", source = "01" }
-    "ndcs-02" = { target = "ndcs", source = "02" }
-    "ndcs-03" = { target = "ndcs", source = "03" }
-  }
+  name_prefix    = "kvs-${var.run_id}"
+  runner_sources = [for index in range(var.runner_count) : format("%02d", index + 1)]
+  runner_matrix = merge(
+    { for source in local.runner_sources : "adb-${source}" => { target = "adb", source = source } },
+    { for source in local.runner_sources : "ndcs-${source}" => { target = "ndcs", source = source } },
+  )
   adb_egress_networks = {
-    "01" = { vcn_cidr = var.adb_egress_vcn_cidrs[0], subnet_cidr = var.adb_egress_subnet_cidrs[0] }
-    "02" = { vcn_cidr = var.adb_egress_vcn_cidrs[1], subnet_cidr = var.adb_egress_subnet_cidrs[1] }
-    "03" = { vcn_cidr = var.adb_egress_vcn_cidrs[2], subnet_cidr = var.adb_egress_subnet_cidrs[2] }
+    for index, source in local.runner_sources : source => {
+      vcn_cidr    = var.adb_egress_vcn_cidrs[index]
+      subnet_cidr = var.adb_egress_subnet_cidrs[index]
+    }
   }
   common_tags = {
     ManagedBy = "Terraform"
@@ -32,13 +30,13 @@ check "existing_iam_is_declared" {
       var.create_tenancy_iam_resources ||
       (var.existing_dynamic_group_name != null && var.existing_policy_name != null)
     )
-    error_message = "When create_tenancy_iam_resources is false, declare the existing dynamic group and policy used by the six runners."
+    error_message = "When create_tenancy_iam_resources is false, declare the existing dynamic group and policy used by the runners."
   }
 }
 
-check "six_distinct_private_ips" {
+check "distinct_private_ips" {
   assert {
-    condition     = length(toset([for runner in oci_core_instance.runner : runner.private_ip])) == 6
+    condition     = length(toset([for runner in oci_core_instance.runner : runner.private_ip])) == 2 * var.runner_count
     error_message = "Every load generator must have a distinct private IP."
   }
 }
@@ -289,8 +287,8 @@ resource "oci_nosql_table" "benchmark" {
 
   table_limits {
     capacity_mode      = "PROVISIONED"
-    max_read_units     = 1000
-    max_write_units    = 1000
+    max_read_units     = var.nosql_read_units
+    max_write_units    = var.nosql_write_units
     max_storage_in_gbs = 10
   }
 }
@@ -303,7 +301,7 @@ resource "oci_database_autonomous_database" "benchmark" {
   db_workload                         = "OLTP"
   db_version                          = "26ai"
   compute_model                       = "ECPU"
-  compute_count                       = 8
+  compute_count                       = var.adb_base_ecpus
   data_storage_size_in_gb             = 20
   license_model                       = "BRING_YOUR_OWN_LICENSE"
   is_auto_scaling_enabled             = false
@@ -327,7 +325,7 @@ resource "oci_core_instance" "runner" {
 
   shape_config {
     ocpus         = 1
-    memory_in_gbs = 1
+    memory_in_gbs = each.value.target == "adb" ? var.adb_runner_memory_gbs : var.nosql_runner_memory_gbs
   }
 
   create_vnic_details {

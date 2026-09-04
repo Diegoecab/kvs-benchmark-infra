@@ -10,7 +10,8 @@ param(
     [string]$Region = "us-ashburn-1",
     [int]$ReadCapacityUnits = 500,
     [int]$WriteCapacityUnits = 500,
-    [int]$AccessKeyLifetimeMinutes = 720,
+    [ValidateRange(1, 360)]
+    [int]$AccessKeyLifetimeMinutes = 360,
     [string]$BenchmarkRepository,
     [switch]$Apply
 )

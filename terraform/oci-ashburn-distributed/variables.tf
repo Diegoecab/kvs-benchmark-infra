@@ -59,6 +59,39 @@ variable "run_id" {
   }
 }
 
+variable "runner_count" {
+  description = "Number of independent load generators per OCI target."
+  type        = number
+  default     = 3
+
+  validation {
+    condition     = var.runner_count >= 1 && var.runner_count <= 3 && floor(var.runner_count) == var.runner_count
+    error_message = "runner_count must be an integer between 1 and 3."
+  }
+}
+
+variable "adb_runner_memory_gbs" {
+  description = "Memory allocated to each ADB DynamoDB API load-generator VM."
+  type        = number
+  default     = 4
+
+  validation {
+    condition     = var.adb_runner_memory_gbs >= 1
+    error_message = "adb_runner_memory_gbs must be at least 1."
+  }
+}
+
+variable "nosql_runner_memory_gbs" {
+  description = "Memory allocated to each OCI NoSQL load-generator VM."
+  type        = number
+  default     = 4
+
+  validation {
+    condition     = var.nosql_runner_memory_gbs >= 1
+    error_message = "nosql_runner_memory_gbs must be at least 1."
+  }
+}
+
 variable "vcn_cidr" {
   description = "CIDR for the dedicated benchmark VCN."
   type        = string
@@ -119,6 +152,39 @@ variable "nosql_table_name" {
   validation {
     condition     = var.nosql_table_name == null || can(regex("^[A-Za-z][A-Za-z0-9_]{0,255}$", var.nosql_table_name))
     error_message = "nosql_table_name must begin with a letter and contain only letters, digits, and underscores."
+  }
+}
+
+variable "nosql_read_units" {
+  description = "Provisioned read units for the OCI NoSQL benchmark table."
+  type        = number
+  default     = 1000
+
+  validation {
+    condition     = var.nosql_read_units >= 1
+    error_message = "nosql_read_units must be positive."
+  }
+}
+
+variable "nosql_write_units" {
+  description = "Provisioned write units for the OCI NoSQL benchmark table."
+  type        = number
+  default     = 1000
+
+  validation {
+    condition     = var.nosql_write_units >= 1
+    error_message = "nosql_write_units must be positive."
+  }
+}
+
+variable "adb_base_ecpus" {
+  description = "Base ECPU allocation of the temporary BYOL Autonomous AI Database. DynamoDB API table scaling is configured independently."
+  type        = number
+  default     = 2
+
+  validation {
+    condition     = var.adb_base_ecpus >= 2
+    error_message = "adb_base_ecpus must be at least 2."
   }
 }
 

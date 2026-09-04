@@ -3,14 +3,19 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$CompartmentOcid,
 
-    [string]$Profile = "LATINOAMERICA_APIKEY",
-    [string]$Region = "us-dallas-1",
+    [string]$Profile = "PITWALL_API",
+    [string]$Region = "us-ashburn-1",
     [string]$DbName = "MELIKVSDDB",
-    [string]$DisplayName = "meli-kvs-ddb-api-dallas",
-    [string]$TableName = "meli_kvs_adb_dallas_500",
+    [string]$DisplayName = "meli-kvs-ddb-api",
+    [string]$TableName = "meli_kvs_adb_api",
     [int]$ReadCapacityUnits = 500,
     [int]$WriteCapacityUnits = 500,
-    [int]$AccessKeyLifetimeMinutes = 720,
+    [int]$BaseEcpus = 2,
+    [int]$StorageGb = 20,
+    [string]$DbVersion = "26ai",
+    [bool]$BaseAutoscalingEnabled = $false,
+    [ValidateRange(1, 360)]
+    [int]$AccessKeyLifetimeMinutes = 360,
     [string]$BenchmarkRepository = (Join-Path (Split-Path $PSScriptRoot -Parent) "..\kvs-benchmark"),
     [switch]$Apply,
     [string]$CostApproval
@@ -19,14 +24,17 @@ param(
 $ErrorActionPreference = "Stop"
 $env:SUPPRESS_LABEL_WARNING = "True"
 
-if ($Region -ne "us-dallas-1") {
-    throw "This workflow is pinned to us-dallas-1."
+if ([string]::IsNullOrWhiteSpace($Region)) {
+    throw "Region must not be empty."
 }
-if ($ReadCapacityUnits -ne 500 -or $WriteCapacityUnits -ne 500) {
-    throw "The reviewed benchmark table capacity is exactly 500 RCU and 500 WCU."
+if ($ReadCapacityUnits -lt 1 -or $WriteCapacityUnits -lt 1) {
+    throw "ReadCapacityUnits and WriteCapacityUnits must both be positive."
 }
-if ($Apply -and $CostApproval -ne "BYOL-ADB-DDB-2.05-USD-HOUR") {
-    throw "Apply requires -CostApproval BYOL-ADB-DDB-2.05-USD-HOUR."
+if ($BaseEcpus -lt 2 -or $StorageGb -lt 1) {
+    throw "BaseEcpus must be at least 2 and StorageGb must be positive."
+}
+if ($Apply -and [string]::IsNullOrWhiteSpace($CostApproval)) {
+    throw "Apply requires an explicit -CostApproval value."
 }
 
 function New-BenchmarkPassword {
@@ -107,13 +115,14 @@ if (-not $Apply) {
         $candidate = $existing[0]
         $matches = $candidate.'license-model' -eq "BRING_YOUR_OWN_LICENSE" -and
             $candidate.'compute-model' -eq "ECPU" -and
-            [double]$candidate.'compute-count' -eq 2 -and
-            [int]$candidate.'data-storage-size-in-gbs' -eq 20 -and
-            -not [bool]$candidate.'is-auto-scaling-enabled'
+            [double]$candidate.'compute-count' -eq $BaseEcpus -and
+            [int]$candidate.'data-storage-size-in-gbs' -eq $StorageGb -and
+            [string]$candidate.'db-version' -eq $DbVersion -and
+            [bool]$candidate.'is-auto-scaling-enabled' -eq $BaseAutoscalingEnabled
         if (-not $matches) {
-            throw "Existing ADB '$DisplayName' does not match the reviewed BYOL/2-ECPU/20-GB/no-base-autoscaling configuration."
+            throw "Existing ADB '$DisplayName' does not match the requested BYOL/ECPU/storage/version/autoscaling configuration."
         }
-        Write-Output "Existing ADB validation passed: BYOL, 2 ECPU, 20 GB, 26ai, us-dallas-1. No resource was changed."
+        Write-Output "Existing ADB validation passed: BYOL, $BaseEcpus ECPU, $StorageGb GB, $DbVersion, $Region. No resource was changed."
         exit 0
     }
     Invoke-OciJson @(
@@ -124,17 +133,17 @@ if (-not $Apply) {
         "--db-name", $DbName,
         "--display-name", $DisplayName,
         "--db-workload", "OLTP",
-        "--db-version", "26ai",
+        "--db-version", $DbVersion,
         "--compute-model", "ECPU",
-        "--compute-count", "2",
-        "--data-storage-size-in-gbs", "20",
+        "--compute-count", $BaseEcpus.ToString(),
+        "--data-storage-size-in-gbs", $StorageGb.ToString(),
         "--admin-password", $adminPassword,
         "--license-model", "BRING_YOUR_OWN_LICENSE",
-        "--is-auto-scaling-enabled", "false",
+        "--is-auto-scaling-enabled", $BaseAutoscalingEnabled.ToString().ToLowerInvariant(),
         "--opc-dry-run", "true",
         "--output", "json"
     ) | Out-Null
-    Write-Output "ADB dry-run passed: BYOL, 2 ECPU, 20 GB, 26ai, us-dallas-1. No resource was created."
+    Write-Output "ADB dry-run passed: BYOL, $BaseEcpus ECPU, $StorageGb GB, $DbVersion, $Region. No resource was created."
     exit 0
 }
 
@@ -161,7 +170,7 @@ if ($existing.Count -eq 1) {
     $adbId = $adb.id
 }
 else {
-    Write-Output "Creating ADB '$DisplayName' with BYOL, 2 ECPU, 20 GB, and base autoscaling disabled..."
+    Write-Output "Creating ADB '$DisplayName' with BYOL, $BaseEcpus ECPU, $StorageGb GB, and base autoscaling=$BaseAutoscalingEnabled..."
     $created = Invoke-OciJson @(
         "db", "autonomous-database", "create",
         "--compartment-id", $CompartmentOcid,
@@ -170,13 +179,13 @@ else {
         "--db-name", $DbName,
         "--display-name", $DisplayName,
         "--db-workload", "OLTP",
-        "--db-version", "26ai",
+        "--db-version", $DbVersion,
         "--compute-model", "ECPU",
-        "--compute-count", "2",
-        "--data-storage-size-in-gbs", "20",
+        "--compute-count", $BaseEcpus.ToString(),
+        "--data-storage-size-in-gbs", $StorageGb.ToString(),
         "--admin-password", $adminPassword,
         "--license-model", "BRING_YOUR_OWN_LICENSE",
-        "--is-auto-scaling-enabled", "false",
+        "--is-auto-scaling-enabled", $BaseAutoscalingEnabled.ToString().ToLowerInvariant(),
         "--wait-for-state", "AVAILABLE",
         "--max-wait-seconds", "2400",
         "--wait-interval-seconds", "20",
@@ -219,7 +228,7 @@ $basic = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("ADMIN:$adminP
 $headers = @{ Authorization = "Basic $basic"; "Request-Id" = [guid]::NewGuid().ToString("N") }
 $body = @{
     name = "meli-kvs-benchmark-$(Get-Date -Format yyyyMMddHHmmss)"
-    description = "Temporary credential for MELI Dallas KVS benchmark"
+    description = "Temporary credential for MELI KVS benchmark"
     permissions = @(@{ actions = @("ADMIN_ANY") })
     expiration_minutes = $AccessKeyLifetimeMinutes
 } | ConvertTo-Json -Depth 6
@@ -243,7 +252,7 @@ if ([string]::IsNullOrWhiteSpace($accessKeyId) -or [string]::IsNullOrWhiteSpace(
     throw "Access-key bootstrap returned an incomplete response."
 }
 
-$secretDirectory = Join-Path (Resolve-Path $BenchmarkRepository) ".secrets\adb-dallas"
+$secretDirectory = Join-Path (Resolve-Path $BenchmarkRepository) (".secrets\adb-" + ($Region -replace "[^A-Za-z0-9._-]", "-"))
 New-Item -ItemType Directory -Path $secretDirectory -Force | Out-Null
 $runtimePath = Join-Path $secretDirectory "adb-api.runtime.json"
 $runtime = [ordered]@{
@@ -269,7 +278,7 @@ try {
     $env:AWS_ACCESS_KEY_ID = $accessKeyId
     $env:AWS_SECRET_ACCESS_KEY = $secretAccessKey
     $env:AWS_DEFAULT_REGION = $Region
-    Write-Output "Creating DynamoDB-compatible table '$TableName' at 500 RCU / 500 WCU..."
+    Write-Output "Creating DynamoDB-compatible table '$TableName' at $ReadCapacityUnits RCU / $WriteCapacityUnits WCU..."
     & aws dynamodb create-table `
         --table-name $TableName `
         --attribute-definitions AttributeName=pk,AttributeType=S AttributeName=sk,AttributeType=S `
